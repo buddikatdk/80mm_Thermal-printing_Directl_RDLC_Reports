@@ -1,0 +1,124 @@
+1)first you have to create a class including following code=>code segment1
+2)Then design your RDLC report body of report only in removing header and footer
+3)Add following code segment to get print out dirctly=>code segment2
+
+
+//code segment1
+using Microsoft.Reporting.WinForms;
+using pos_sinhala;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Drawing.Printing;
+using System.IO;
+
+public static class LocalReportExtensions
+
+{
+    
+    public static void Print(this LocalReport reportViewer1, PageSettings pageSettings)
+    {
+
+        //var pageSettings = new PageSettings();
+        FrmSecurity fs = new FrmSecurity();
+        frmPOS fr = new frmPOS(fs);
+        frmReceipt f = new frmReceipt(fr);
+        //pageSettings.PaperSize = reportViewer1.GetDefaultPageSettings().PaperSize;
+        pageSettings.PaperSize = f.reportViewer1.GetPageSettings().PaperSize;
+        pageSettings.Landscape = false;
+        pageSettings.Margins = f.reportViewer1.GetPageSettings().Margins;
+        Print(reportViewer1, pageSettings);
+    }
+
+
+    public static void Print(this LocalReport report, ReportViewer reportViewer1, PageSettings pageSettings)
+    {
+        FrmSecurity fs = new FrmSecurity();
+        frmPOS fr = new frmPOS(fs);
+        frmReceipt f = new frmReceipt(fr);
+        string deviceInfo =
+            $@"<DeviceInfo>
+                <OutputFormat>EMF</OutputFormat>
+                <PageWidth>3.5in</PageWidth>
+                <PageHeight>8in</PageHeight>
+                <MarginTop>0</MarginTop>
+                <MarginLeft>0.0001in</MarginLeft>
+                <MarginRight>0</MarginRight>
+                <MarginBottom>0</MarginBottom>
+            </DeviceInfo>";
+
+        Warning[] warnings;
+        var streams = new List<Stream>();
+        var currentPageIndex = 0;
+
+        report.Render("Image", deviceInfo,
+            (name, fileNameExtension, encoding, mimeType, willSeek) =>
+            {
+                var stream = new MemoryStream();
+                streams.Add(stream);
+                return stream;
+            }, out warnings);
+
+        foreach (Stream stream in streams)
+            stream.Position = 0;
+
+        if (streams == null || streams.Count == 0)
+            throw new Exception("Error: no stream to print.");
+
+        var printDocument = new PrintDocument();
+        printDocument.DefaultPageSettings = pageSettings;
+        if (!printDocument.PrinterSettings.IsValid)
+            throw new Exception("Error: cannot find the default printer.");
+        else
+        {
+            
+            printDocument.PrintPage += (sender, e) =>
+            {
+                Metafile pageImage1 = new Metafile(streams[currentPageIndex]);
+                Rectangle adjustedRect = new Rectangle(
+                    (int)f.reportViewer1.Left - (int)e.PageSettings.HardMarginX,
+                     (int)f.reportViewer1.Top - (int)e.PageSettings.HardMarginY,
+                    (int)f.reportViewer1.Width,
+                    (int)f.reportViewer1.Height);
+
+
+                e.Graphics.FillRectangle(Brushes.White, adjustedRect);
+
+                e.Graphics.DrawImage(pageImage1, adjustedRect);///reportViewer1.AllowDrop(MetafileHeader);
+                currentPageIndex++;
+
+                e.HasMorePages = (currentPageIndex < streams.Count);
+                // Metafile pageImage2 = new Metafile(streams[currentPageIndex]);
+                //e.PageBounds;
+
+                e.Graphics.FillRectangle(Brushes.White, adjustedRect);
+                e.Graphics.DrawImage(pageImage1, adjustedRect);
+
+                //e.Graphics.FillRectangle(Brushes.White, adjustedRect);
+                //e.Graphics.DrawImage(pageImage1, adjustedRect);
+                //currentPageIndex++;
+                //e.HasMorePages = (currentPageIndex < streams.Count);
+                //e.Graphics.DrawRectangle(Pens.Red, adjustedRect);
+
+                //////////////////////////////////////////////////////////////e.Graphics.DrawRectangle(Pens.Red, adjustedRect);
+            };
+            printDocument.EndPrint += (Sender, e) =>
+            {
+                if (streams != null)
+                {
+                    foreach (Stream stream in streams)
+                        stream.Close();
+                    streams = null;
+                }
+            };
+            printDocument.Print();
+        }
+    }
+}
+
+
+//code segment2
+kk = reportViewer1.GetPageSettings();//this kk is only for initializer
+kk.Landscape = false;
+ reportViewer1.LocalReport.Print(reportViewer1,kk);
